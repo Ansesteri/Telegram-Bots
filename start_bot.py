@@ -21,7 +21,8 @@ def start_game(message):
       guessed_number += digit
       digits.remove(digit)
    print(guessed_number)
-   bot.reply_to(message, f'I guessed a 4-digit number, try to guess, {message.from_user.first_name}!')
+   bot.reply_to(message, 'Game "Bulls and Cows"\n' 
+                f'I guessed a 4-digit number, try to guess, {message.from_user.first_name}!')
 
 @bot.message_handler(content_types=['text'])
 def bot_answer(message):
@@ -29,7 +30,7 @@ def bot_answer(message):
    if len(text) == 4 and text.isnumeric() and len(text) == len(set(text)):
       bulls, cows = get_bulls_cows(text, guessed_number)
       if bulls == 4:
-         response = 'You guessed right, you win!'
+         response = 'You guessed right, you can start new game using /game or /start!'
       else:
          response = f'Bulls: {bulls} | Cows: {cows}'
    else:
