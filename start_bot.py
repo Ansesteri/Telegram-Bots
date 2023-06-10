@@ -7,11 +7,12 @@ from config import BOT_TOKEN
 
 bot = telebot.TeleBot(BOT_TOKEN)
 guessed_number = ''
+tries = 0
 
 @bot.message_handler(commands=['start', 'game'])
 def start_game(message):
    digits = [s for s in string.digits]
-   global guessed_number
+   global guessed_number, tries
    guessed_number = ''
    for pos in range(4):
       if pos:
@@ -21,6 +22,7 @@ def start_game(message):
       guessed_number += digit
       digits.remove(digit)
    print(guessed_number)
+   tries = 0
    bot.reply_to(message, 'Game "Bulls and Cows"\n' 
                 f'I guessed a 4-digit number, try to guess, {message.from_user.first_name}!')
 
@@ -36,12 +38,19 @@ Number is 4-digit without repeated numbers in it (ex. : 2139).
 @bot.message_handler(content_types=['text'])
 def bot_answer(message):
    text = message.text
+   global tries
    if len(text) == 4 and text.isnumeric() and len(text) == len(set(text)):
+      tries += 1
       bulls, cows = get_bulls_cows(text, guessed_number)
       if bulls == 4:
-         response = 'You guessed right, you can start new game using /game or /start!'
+         if tries <= 3:
+            response = f'You guessed right really fast, only in {tries} tries, you can start new game using /game or /start!'
+         elif tries >= 4 and tries < 8:
+            response = f'You guessed right in {tries} tries, you can start new game using /game or /start!'
+         elif tries >= 8:
+            response = f'You guessed right really slow, it took you {tries} tries, you can start new game using /game or /start!'
       else:
-         response = f'Bulls: {bulls} | Cows: {cows}'
+         response = f'Bulls: {bulls} | Cows: {cows} | Tries: {tries}'
    else:
       response = 'Send 4-digit number that has unique numbers!'
    bot.send_message(message.from_user.id, response)
