@@ -20,7 +20,7 @@ def start_game(message):
          digit = random.choice(digits[1:])
       guessed_number += digit
       digits.remove(digit)
-   bot.reply_to(message, guessed_number)
+   bot.reply_to(message, f'I guessed a 4-digit number, try to guess, {message.from_user.first_name}!')
 
 if __name__ == '__main__':
    print('Bot started!')
