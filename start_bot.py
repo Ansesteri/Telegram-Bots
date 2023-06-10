@@ -24,6 +24,15 @@ def start_game(message):
    bot.reply_to(message, 'Game "Bulls and Cows"\n' 
                 f'I guessed a 4-digit number, try to guess, {message.from_user.first_name}!')
 
+@bot.message_handler(commands=['help'])
+def show_help(message):
+   bot.reply_to(message, """
+Game "Bulls and Cows"
+
+Game where you need to guess in few attempts number that bot guessed. 
+Number is 4-digit without repeated numbers in it (ex. : 2139). 
+""")
+
 @bot.message_handler(content_types=['text'])
 def bot_answer(message):
    text = message.text
