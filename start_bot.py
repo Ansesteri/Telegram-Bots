@@ -22,6 +22,15 @@ def start_game(message):
       digits.remove(digit)
    bot.reply_to(message, f'I guessed a 4-digit number, try to guess, {message.from_user.first_name}!')
 
+@bot.message_handler(content_types=['text'])
+def bot_answer(message):
+   text = message.text
+   if len(text) == 4 and text.isnumeric():
+      response = text
+   else:
+      response = 'Send 4-digit number!'
+   bot.send_message(message.from_user.id, response)
+
 if __name__ == '__main__':
    print('Bot started!')
    bot.polling(non_stop=True)
