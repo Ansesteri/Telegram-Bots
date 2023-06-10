@@ -26,11 +26,14 @@ def start_game(message):
 @bot.message_handler(content_types=['text'])
 def bot_answer(message):
    text = message.text
-   if len(text) == 4 and text.isnumeric():
+   if len(text) == 4 and text.isnumeric() and len(text) == len(set(text)):
       bulls, cows = get_bulls_cows(text, guessed_number)
-      response = f'Bulls: {bulls} | Cows: {cows}'
+      if bulls == 4:
+         response = 'You guessed right, you win!'
+      else:
+         response = f'Bulls: {bulls} | Cows: {cows}'
    else:
-      response = 'Send 4-digit number!'
+      response = 'Send 4-digit number that has unique numbers!'
    bot.send_message(message.from_user.id, response)
 
 def get_bulls_cows(text1, text2):
