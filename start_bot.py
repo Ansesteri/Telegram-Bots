@@ -7,7 +7,7 @@ from config import BOT_TOKEN
 
 bot = telebot.TeleBot(BOT_TOKEN)
 guessed_number = ''
-tries = 0
+tries = -1 # tries = -1 if game is not active
 
 @bot.message_handler(commands=['start', 'game'])
 def start_game(message):
@@ -37,23 +37,46 @@ Number is 4-digit without repeated numbers in it (ex. : 2139).
 
 @bot.message_handler(content_types=['text'])
 def bot_answer(message):
-   text = message.text
    global tries
-   if len(text) == 4 and text.isnumeric() and len(text) == len(set(text)):
-      tries += 1
+   text = message.text
+   if tries == -1:
+      if text == 'Yes':
+         start_game(message)
+         return
+      else:
+         response =  'To start the game write /start'
+   elif len(text) == 4 and text.isnumeric() and len(text) == len(set(text)):
       bulls, cows = get_bulls_cows(text, guessed_number)
+      tries += 1
       if bulls == 4:
          if tries <= 3:
-            response = f'You guessed right really fast, only in {tries} tries, you can start new game using /game or /start!'
+            response = f'You guessed right really fast, only in {tries} tries, do you want to play again?'
+            bot.send_message(message.from_user.id, response, reply_markup=get_restart_buttons())
+            tries = -1
+            return
          elif tries >= 4 and tries < 8:
-            response = f'You guessed right in {tries} tries, you can start new game using /game or /start!'
+            response = f'You guessed right in {tries} tries, do you want to play again?'
+            bot.send_message(message.from_user.id, response, reply_markup=get_restart_buttons())
+            tries = -1
+            return
          elif tries >= 8:
-            response = f'You guessed right really slow, it took you {tries} tries, you can start new game using /game or /start!'
+            response = f'You guessed right really slow, it took you {tries} tries, do you want to play again?'
+            bot.send_message(message.from_user.id, response, reply_markup=get_restart_buttons())
+            tries = -1
+            return
       else:
          response = f'Bulls: {bulls} | Cows: {cows} | Tries: {tries}'
    else:
       response = 'Send 4-digit number that has unique numbers!'
    bot.send_message(message.from_user.id, response)
+
+def get_restart_buttons():
+   buttons = telebot.types.ReplyKeyboardMarkup(
+      one_time_keyboard=True,
+      resize_keyboard=True,
+   )
+   buttons.add('Yes', 'No')
+   return buttons
 
 def get_bulls_cows(text1, text2):
    bulls = cows = 0
