@@ -8,6 +8,7 @@ storage = shelve.open(DB_NAME, writeback=True)
 
 @dataclass
 class User:
+   mode: str = '' # 'bot', 'user', 'duel'
    number: str = ''
    level: int = DEFAULT_USER_LEVEL
    tries: int = 0
