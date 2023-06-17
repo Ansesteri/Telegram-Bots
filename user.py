@@ -1,10 +1,14 @@
 import shelve
 from dataclasses import dataclass
 
-from config import DB_NAME
+from config import DB_NAME, DEBUG
 
 DEFAULT_USER_LEVEL = 4
-storage = shelve.open(DB_NAME, writeback=True)
+if DEBUG:
+   storage = shelve.open(DB_NAME, writeback=True, flag='n')
+   storage.clear()
+else:
+   storage = shelve.open(DB_NAME, writeback=True)
 
 @dataclass
 class User:
