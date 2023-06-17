@@ -4,7 +4,8 @@ import string
 
 import telebot
 
-from config import BOT_TOKEN, DB_NAME
+from config import BOT_TOKEN
+from user import User, DEFAULT_USER_LEVEL, get_or_create_user, save_user, del_user
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -33,8 +34,10 @@ def start_game(message, level):
       guessed_number += digit
       digits.remove(digit)
    print(f'{guessed_number} for {message.from_user.username}')
-   with shelve.open(DB_NAME) as storage:
-      storage[str(message.from_user.id)] = (guessed_number, 0)
+   user = get_or_create_user(message.from_user.id)
+   user.level = level
+   user.reset(guessed_number)
+   save_user(message.from_user.id, user)
    bot.reply_to(message, 'Game "Bulls and Cows"\n' 
                 f'I guessed a {level}-digit number, try to guess, {message.from_user.first_name}!')
 
@@ -50,39 +53,36 @@ After every try bot will say count of right numbers, numbers that are not in cor
 @bot.message_handler(content_types=['text'])
 def bot_answer(message):
    text = message.text
-   try:
-      with shelve.open(DB_NAME) as storage:
-         guessed_number, tries = storage[str(message.from_user.id)]
-      level = len(guessed_number)
-      if len(text) == level and text.isnumeric() and len(text) == len(set(text)):
-         bulls, cows = get_bulls_cows(text, guessed_number)
-         tries += 1
-         if bulls != level:
-            response = f'Bulls: {bulls} | Cows: {cows} | Tries: {tries}'
-            with shelve.open(DB_NAME) as storage:
-               storage[str(message.from_user.id)] = (guessed_number, tries)
+   user = get_or_create_user(message.from_user.id)
+   if user.number:
+      if len(text) == user.level and text.isnumeric() and len(text) == len(set(text)):
+         bulls, cows = get_bulls_cows(text, user.number)
+         user.tries += 1
+         if bulls != user.level:
+            response = f'Bulls: {bulls} | Cows: {cows} | Tries: {user.tries}'
+            save_user(message.from_user.id, user)
          else:
-            if tries <= 3:
-               response = f'You guessed right really fast, only in {tries} tries, do you want to play again?'
-               with shelve.open(DB_NAME) as storage:
-                  del storage[str(message.from_user.id)]
+            if user.tries <= 3:
+               response = f'You guessed right really fast, only in {user.tries} tries, do you want to play again?'
+               user.reset()
+               save_user(message.from_user.id, user)
                bot.send_message(message.from_user.id, response, reply_markup=get_restart_buttons())
                return
-            elif tries >= 4 and tries < 8:
-               response = f'You guessed right in {tries} tries, do you want to play again?'
-               with shelve.open(DB_NAME) as storage:
-                  del storage[str(message.from_user.id)]
+            elif user.tries >= 4 and user.tries < 8:
+               response = f'You guessed right in {user.tries} tries, do you want to play again?'
+               user.reset()
+               save_user(message.from_user.id, user)
                bot.send_message(message.from_user.id, response, reply_markup=get_restart_buttons())
                return
-            elif tries >= 8:
-               response = f'You guessed right really slow, it took you {tries} tries, do you want to play again?'
-               with shelve.open(DB_NAME) as storage:
-                  del storage[str(message.from_user.id)]
+            elif user.tries >= 8:
+               response = f'You guessed right really slow, it took you {user.tries} tries, do you want to play again?'
+               user.reset()
+               save_user(message.from_user.id, user)
                bot.send_message(message.from_user.id, response, reply_markup=get_restart_buttons())
                return
       else:
-         response = f'Send {level}-digit number that has unique numbers!'
-   except KeyError:
+         response = f'Send {user.level}-digit number that has unique numbers!'
+   else:
       if text in ('3', '4', '5'):
          start_game(message, int(text))
          return
