@@ -9,8 +9,11 @@ from user import User, DEFAULT_USER_LEVEL, get_or_create_user, save_user, del_us
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-@bot.message_handler(commands=['start', 'game'])
+@bot.message_handler(commands=['level'])
 def select_level(message):
+   user = get_or_create_user(message.from_user.id)
+   user.reset()
+   save_user(message.from_user.id, user)
    response = 'Game "Bulls and Cows"\n' + \
                'Chose level (digit count)'
    bot.send_message(message.from_user.id, response, reply_markup=get_level_buttons())
@@ -23,10 +26,14 @@ def get_level_buttons():
    buttons.add('3', '4', '5')
    return buttons
 
-def start_game(message, level):
+@bot.message_handler(commands=['start', 'game'])
+def start_game(message, level=None):
+   user = get_or_create_user(message.from_user.id)
+   if level:
+      user.level = level
    digits = [s for s in string.digits]
    guessed_number = ''
-   for pos in range(level):
+   for pos in range(user.level):
       if pos:
          digit = random.choice(digits)
       else:
@@ -34,12 +41,10 @@ def start_game(message, level):
       guessed_number += digit
       digits.remove(digit)
    print(f'{guessed_number} for {message.from_user.username}')
-   user = get_or_create_user(message.from_user.id)
-   user.level = level
    user.reset(guessed_number)
    save_user(message.from_user.id, user)
    bot.reply_to(message, 'Game "Bulls and Cows"\n' 
-                f'I guessed a {level}-digit number, try to guess, {message.from_user.first_name}!')
+                f'I guessed a {user.level}-digit number, try to guess, {message.from_user.first_name}!')
 
 @bot.message_handler(commands=['help'])
 def show_help(message):
@@ -87,10 +92,10 @@ def bot_answer(message):
          start_game(message, int(text))
          return
       elif text == 'Yes':
-         select_level(message)
+         start_game(message, user.level)
          return
       else:
-         response =  'To start the game write /start'
+         response =  'To start the game write /start or additionaly choose level with /level'
    bot.send_message(message.from_user.id, response)
 
 def get_restart_buttons():
