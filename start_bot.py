@@ -1,6 +1,6 @@
 import random
-import shelve
 import string
+from itertools import product
 
 import telebot
 
@@ -15,16 +15,17 @@ def select_mode(message):
    user.mode = ''
    user.reset()
    response = 'Game "Bulls and Cows"\n' + \
-               'Chose moe (who guesses the number)'
+               'Chose mode (who guesses the number)'
    bot.send_message(message.from_user.id, response, reply_markup=get_buttons('Bot', 'User'))
 
 @bot.message_handler(commands=['level'])
 def select_level(message):
    user = get_or_create_user(message.from_user.id)
    user.reset()
+   user.level = None
    save_user(message.from_user.id, user)
    response = 'Game "Bulls and Cows"\n' + \
-               'Chose level (digit count)'
+               'Choose level (digit count)'
    bot.send_message(message.from_user.id, response, reply_markup=get_buttons('3', '4', '5'))
 
 @bot.message_handler(commands=['start', 'game'])
@@ -35,20 +36,25 @@ def start_game(message, level=None):
       return
    if level:
       user.level = level
-   digits = [s for s in string.digits]
-   guessed_number = ''
-   for pos in range(user.level):
-      if pos:
-         digit = random.choice(digits)
-      else:
-         digit = random.choice(digits[1:])
-      guessed_number += digit
-      digits.remove(digit)
-   print(f'{guessed_number} for {message.from_user.username}')
-   user.reset(guessed_number)
-   save_user(message.from_user.id, user)
-   bot.reply_to(message, 'Game "Bulls and Cows"\n' 
-                f'I guessed a {user.level}-digit number, try to guess, {message.from_user.first_name}!')
+   if user.mode == 'bot':
+      digits = [s for s in string.digits]
+      guessed_number = ''
+      for pos in range(user.level):
+         if pos:
+            digit = random.choice(digits)
+         else:
+            digit = random.choice(digits[1:])
+         guessed_number += digit
+         digits.remove(digit)
+      print(f'{guessed_number} for {message.from_user.username}')
+      user.reset(guessed_number)
+      save_user(message.from_user.id, user)
+      bot.reply_to(message, 'Game "Bulls and Cows"\n' 
+                  f'I guessed a {user.level}-digit number, try to guess, {message.from_user.first_name}!')
+   elif user.mode == 'user':
+      bot.reply_to(message, 'Game "Bulls and Cows"\n' 
+                  f'Guess a {user.level}-digit number, and I will try to guess it and you send me count of bulls and cows, {message.from_user.first_name}!')
+      bot_answer_with_guess(message, user)
 
 @bot.message_handler(commands=['help'])
 def show_help(message):
@@ -62,8 +68,10 @@ After every try bot will say count of right numbers, numbers that are not in cor
 @bot.message_handler(content_types=['text'])
 def bot_answer(message):
    user = get_or_create_user(message.from_user.id)
-   if user.number:
+   if user.number and user.mode == 'bot':
       bot_answer_to_user_guess(message, user)
+   elif user.level and user.mode == 'user':
+      bot_answer_with_guess(message, user)
    else:
       bot_answer_not_in_game(message, user)
 
@@ -117,6 +125,18 @@ def bot_answer_to_user_guess(message, user):
    else:
       response = f'Send {user.level}-digit number that has unique numbers!'
    bot.send_message(message.from_user.id, response)
+
+def bot_answer_with_guess(message, user):
+   all_variants = [''.join(x) for x in product(string.digits, repeat=user.level)
+                   if len(x) == len(set(x)) and x[0] != '0']
+   guess = random.choice(all_variants)
+   keys = []
+   for bulls in range(user.level + 1):
+      for cows in range(user.level + 1 - bulls):
+         keys.append(f'{bulls}-{cows}')
+   response = f'My variant is {guess}\n' + \
+               'How many bulls and cows I guessed?'
+   bot.send_message(message.from_user.id, response, reply_markup=get_buttons(*keys))
 
 def get_buttons(*args):
    buttons = telebot.types.ReplyKeyboardMarkup(
