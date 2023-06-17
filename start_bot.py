@@ -127,9 +127,25 @@ def bot_answer_to_user_guess(message, user):
    bot.send_message(message.from_user.id, response)
 
 def bot_answer_with_guess(message, user):
+   history = list(user.history)
+   if history:
+      history[-1] = (history[-1][0], *[int(x) for x in message.text.split('-')])
    all_variants = [''.join(x) for x in product(string.digits, repeat=user.level)
                    if len(x) == len(set(x)) and x[0] != '0']
-   guess = random.choice(all_variants)
+   while all_variants:
+      guess = random.choice(all_variants)
+      all_variants.remove(guess)
+      if is_compatible(guess, history):
+         break
+   else:
+      response = 'Unfortunately, in your answers were mistakes, I don`t have any variants left... (Send /start to start new game)'
+      user.reset()
+      save_user(message.from_user.id, user)
+      bot.send_message(message.from_user.id, response)
+      return
+   history.append((guess, None, None))
+   user.history = tuple(history)
+   save_user(message.from_user.id, user)
    keys = []
    for bulls in range(user.level + 1):
       for cows in range(user.level + 1 - bulls):
@@ -137,6 +153,10 @@ def bot_answer_with_guess(message, user):
    response = f'My variant is {guess}\n' + \
                'How many bulls and cows I guessed?'
    bot.send_message(message.from_user.id, response, reply_markup=get_buttons(*keys))
+
+def is_compatible(guess, history):
+   return all(get_bulls_cows(guess, previous_guess) == (bulls, cows) 
+                for previous_guess, bulls, cows in history)
 
 def get_buttons(*args):
    buttons = telebot.types.ReplyKeyboardMarkup(

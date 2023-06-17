@@ -12,8 +12,11 @@ class User:
    number: str = ''
    level: int = DEFAULT_USER_LEVEL
    tries: int = 0
+   history: tuple = ()
+
    def reset(self, new_number = ''):
       self.number = new_number
+      self.history = ()
       self.tries = 0
 
 def get_or_create_user(id):
