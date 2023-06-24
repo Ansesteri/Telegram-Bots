@@ -182,13 +182,17 @@ def bot_answer_with_guess(message, user):
 def bot_has_won(message, user):
    history = list(user.history)
    if history:
-      history[-1] = (history[-1][0], *[int(x) for x in message.text.split('-')[:2]])
-      if history[-1][1] == user.level:
-         response = f'I won in {user.tries} tries!!!'
-         stop_game_with_message(message, user, response)
+      try:
+         history[-1] = (history[-1][0], *[int(x) for x in message.text.split('-')[:2]])
+         if history[-1][1] == user.level:
+            response = f'I won in {user.tries} tries!!!'
+            stop_game_with_message(message, user, response)
+            return True
+         user.history = tuple(history)
+         save_user(message.from_user.id, user)
+      except ValueError:
+         stop_game_with_message(message, user, 'Game stopped, unidentified command')
          return True
-      user.history = tuple(history)
-      save_user(message.from_user.id, user)
    return False
 
 def stop_game_with_message(message, user, response):
