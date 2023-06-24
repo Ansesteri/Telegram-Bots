@@ -56,7 +56,7 @@ def start_game(message, level=None):
       else:
          response += (f'I guessed a {user.level}-digit number, guess a number too.\n'
          f'Whoever guesses first wins, Your turn {message.from_user.first_name}')
-         bot.reply_to(message, response)
+      bot.reply_to(message, response)
    elif user.mode == 'user':
       bot.reply_to(message, 'Game "Bulls and Cows"\n' 
                   f'Guess a {user.level}-digit number, and I will try to guess it and you send me count of bulls and cows, {message.from_user.first_name}!')
@@ -81,7 +81,11 @@ def bot_answer(message):
    elif user.mode == 'duel' and not user.next_turn:
       if bot_has_won(message, user):
          return
-      bot.send_message(message.from_user.id, 'Your turn!')
+      response = ''
+      for number, bulls, cows, in user.user_history:
+         response = f'{number} | {bulls} bulls | {cows} cows \n'
+      response += f'Your turn! ({user.tries+1} try)'
+      bot.send_message(message.from_user.id, response)
       user.next_turn = True
       save_user(message.from_user.id, user)
    else:
@@ -113,11 +117,15 @@ def bot_answer_to_user_guess(message, user):
    text = message.text
    if len(text) == user.level and text.isnumeric() and len(text) == len(set(text)):
       bulls, cows = get_bulls_cows(text, user.number)
+      history = list(user.user_history)
+      history.append((text, bulls, cows))
+      user.user_history = tuple(history)
       user.tries += 1
       user.next_turn = False
       if bulls != user.level:
          response = f'Bulls: {bulls} | Cows: {cows} | Tries: {user.tries}'
          save_user(message.from_user.id, user)
+         bot.send_message(message.from_user.id, response)
          if user.mode == 'duel':
             bot_answer_with_guess(message, user)
       else:
@@ -126,22 +134,19 @@ def bot_answer_to_user_guess(message, user):
             user.reset()
             save_user(message.from_user.id, user)
             bot.send_message(message.from_user.id, response, reply_markup=get_buttons('Yes', 'No'))
-            return
          elif user.tries >= 4 and user.tries < 8:
             response = f'You guessed right in {user.tries} tries, do you want to play again?'
             user.reset()
             save_user(message.from_user.id, user)
             bot.send_message(message.from_user.id, response, reply_markup=get_buttons('Yes', 'No'))
-            return
          elif user.tries >= 8:
             response = f'You guessed right really slow, it took you {user.tries} tries, do you want to play again?'
             user.reset()
             save_user(message.from_user.id, user)
             bot.send_message(message.from_user.id, response, reply_markup=get_buttons('Yes', 'No'))
-            return
    else:
       response = f'Send {user.level}-digit number that has unique numbers!'
-   bot.send_message(message.from_user.id, response)
+      bot.send_message(message.from_user.id, response)
 
 def bot_answer_with_guess(message, user):
    if user.mode == 'user' and bot_has_won(message, user):
