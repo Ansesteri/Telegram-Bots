@@ -7,6 +7,7 @@ import telebot
 from config import BOT_TOKEN
 from user import User, DEFAULT_USER_LEVEL, get_or_create_user, save_user, del_user
 
+GAME_MODES = ('Bot', 'User', 'Duel')
 bot = telebot.TeleBot(BOT_TOKEN)
 
 @bot.message_handler(commands=['mode'])
@@ -16,7 +17,7 @@ def select_mode(message):
    user.reset()
    response = 'Game "Bulls and Cows"\n' + \
                'Chose mode (who guesses the number)'
-   bot.send_message(message.from_user.id, response, reply_markup=get_buttons('Bot', 'User'))
+   bot.send_message(message.from_user.id, response, reply_markup=get_buttons(*GAME_MODES))
 
 @bot.message_handler(commands=['level'])
 def select_level(message):
@@ -30,13 +31,14 @@ def select_level(message):
 
 @bot.message_handler(commands=['start', 'game'])
 def start_game(message, level=None):
+   response = 'Game "Bulls and Cows"\n'
    user = get_or_create_user(message.from_user.id)
    if not user.mode:
       select_mode(message)
       return
    if level:
       user.level = level
-   if user.mode == 'bot':
+   if user.mode in ('bot', 'duel'):
       digits = [s for s in string.digits]
       guessed_number = ''
       for pos in range(user.level):
@@ -49,8 +51,12 @@ def start_game(message, level=None):
       print(f'{guessed_number} for {message.from_user.username}')
       user.reset(guessed_number)
       save_user(message.from_user.id, user)
-      bot.reply_to(message, 'Game "Bulls and Cows"\n' 
-                  f'I guessed a {user.level}-digit number, try to guess, {message.from_user.first_name}!')
+      if user.mode == 'bot':
+         response += f'I guessed a {user.level}-digit number, try to guess, {message.from_user.first_name}!'
+      else:
+         response += (f'I guessed a {user.level}-digit number, guess a number too.\n'
+         f'Whoever guesses first wins, Your turn {message.from_user.first_name}')
+         bot.reply_to(message, response)
    elif user.mode == 'user':
       bot.reply_to(message, 'Game "Bulls and Cows"\n' 
                   f'Guess a {user.level}-digit number, and I will try to guess it and you send me count of bulls and cows, {message.from_user.first_name}!')
@@ -68,10 +74,16 @@ After every try bot will say count of right numbers, numbers that are not in cor
 @bot.message_handler(content_types=['text'])
 def bot_answer(message):
    user = get_or_create_user(message.from_user.id)
-   if user.number and user.mode == 'bot':
+   if user.number and (user.mode == 'bot' or (user.mode == 'duel' and user.next_turn)):
       bot_answer_to_user_guess(message, user)
    elif user.level and user.mode == 'user':
       bot_answer_with_guess(message, user)
+   elif user.mode == 'duel' and not user.next_turn:
+      if bot_has_won(message, user):
+         return
+      bot.send_message(message.from_user.id, 'Your turn!')
+      user.next_turn = True
+      save_user(message.from_user.id, user)
    else:
       bot_answer_not_in_game(message, user)
 
@@ -83,11 +95,13 @@ def bot_answer_not_in_game(message, user):
    elif text == 'Yes':
       start_game(message, user.level)
       return
-   elif not user.mode and text in ('Bot', 'User'):
+   elif not user.mode and text in GAME_MODES:
       if text == 'Bot':
          user.mode = 'bot'
       elif text == 'User':
          user.mode = 'user'
+      elif text == 'Duel':
+         user.mode = 'duel'
       save_user(message.from_user.id, user)
       start_game(message, user.level)
       return
@@ -100,9 +114,12 @@ def bot_answer_to_user_guess(message, user):
    if len(text) == user.level and text.isnumeric() and len(text) == len(set(text)):
       bulls, cows = get_bulls_cows(text, user.number)
       user.tries += 1
+      user.next_turn = False
       if bulls != user.level:
          response = f'Bulls: {bulls} | Cows: {cows} | Tries: {user.tries}'
          save_user(message.from_user.id, user)
+         if user.mode == 'duel':
+            bot_answer_with_guess(message, user)
       else:
          if user.tries <= 3:
             response = f'You guessed right really fast, only in {user.tries} tries, do you want to play again?'
@@ -127,13 +144,9 @@ def bot_answer_to_user_guess(message, user):
    bot.send_message(message.from_user.id, response)
 
 def bot_answer_with_guess(message, user):
+   if user.mode == 'user' and bot_has_won(message, user):
+      return
    history = list(user.history)
-   if history:
-      history[-1] = (history[-1][0], *[int(x) for x in message.text.split('-')[:2]])
-      if history[-1][1] == user.level:
-         response = f'I won in {user.tries} tries!!!'
-         stop_game_with_message(message, user, response)
-         return
    all_variants = [''.join(x) for x in product(string.digits, repeat=user.level)
                    if len(x) == len(set(x)) and x[0] != '0']
    while all_variants:
@@ -146,7 +159,8 @@ def bot_answer_with_guess(message, user):
       stop_game_with_message(message, user, response)
       return
    history.append((guess, None, None))
-   user.tries += 1
+   if user.mode == 'user':
+      user.tries += 1
    user.history = tuple(history)
    save_user(message.from_user.id, user)
    keys = []
@@ -159,6 +173,18 @@ def bot_answer_with_guess(message, user):
    response = f'My variant is {guess} ({user.tries} try)\n' + \
                'How many bulls and cows I guessed?'
    bot.send_message(message.from_user.id, response, reply_markup=get_buttons(*keys))
+
+def bot_has_won(message, user):
+   history = list(user.history)
+   if history:
+      history[-1] = (history[-1][0], *[int(x) for x in message.text.split('-')[:2]])
+      if history[-1][1] == user.level:
+         response = f'I won in {user.tries} tries!!!'
+         stop_game_with_message(message, user, response)
+         return True
+      user.history = tuple(history)
+      save_user(message.from_user.id, user)
+   return False
 
 def stop_game_with_message(message, user, response):
    user.reset()

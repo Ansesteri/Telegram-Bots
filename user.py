@@ -17,11 +17,13 @@ class User:
    level: int = DEFAULT_USER_LEVEL
    tries: int = 0
    history: tuple = ()
+   next_turn: bool = True
 
    def reset(self, new_number = ''):
       self.number = new_number
       self.history = ()
       self.tries = 0
+      self.next_turn = True
 
 def get_or_create_user(id):
    return storage.get(str(id), User())
