@@ -129,9 +129,9 @@ def bot_answer_to_user_guess(message, user):
 def bot_answer_with_guess(message, user):
    history = list(user.history)
    if history:
-      history[-1] = (history[-1][0], *[int(x) for x in message.text.split('-')])
+      history[-1] = (history[-1][0], *[int(x) for x in message.text.split('-')[:2]])
       if history[-1][1] == user.level:
-         response = 'I won!!'
+         response = f'I won in {user.tries} tries!!!'
          stop_game_with_message(message, user, response)
          return
    all_variants = [''.join(x) for x in product(string.digits, repeat=user.level)
@@ -146,13 +146,17 @@ def bot_answer_with_guess(message, user):
       stop_game_with_message(message, user, response)
       return
    history.append((guess, None, None))
+   user.tries += 1
    user.history = tuple(history)
    save_user(message.from_user.id, user)
    keys = []
    for bulls in range(user.level + 1):
       for cows in range(user.level + 1 - bulls):
-         keys.append(f'{bulls}-{cows}')
-   response = f'My variant is {guess}\n' + \
+         if bulls != 4:
+            keys.append(f'{bulls}-{cows}')
+         else:
+            keys.append(f'{bulls}-{cows}-Bot won!')
+   response = f'My variant is {guess} ({user.tries} try)\n' + \
                'How many bulls and cows I guessed?'
    bot.send_message(message.from_user.id, response, reply_markup=get_buttons(*keys))
 
